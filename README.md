@@ -1,2 +1,2 @@
-# zig-project
-This is a university project aimed at helping people quit smoking.
+# zig-project-backend
+This is the backend for a university project aimed at helping people quit smoking.
