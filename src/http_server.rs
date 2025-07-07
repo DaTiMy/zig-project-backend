@@ -4,6 +4,9 @@ use tokio::sync::Mutex;
 use crate::ZigService;
 use crate::zig_error::{ZigAnyResult, ZigError};
 use serde::Deserialize;
+use actix_cors::Cors;
+use actix_web::http;
+use std::env;
 
 #[derive(Deserialize)]
 pub struct CreateZigRequest {
@@ -74,8 +77,19 @@ pub async fn start_http_server(zig_service: Arc<ZigService>) -> ZigAnyResult<()>
         zig_service: Arc::clone(&zig_service),
     }));
 
+    let host = env::var("HTTP_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let port = env::var("HTTP_PORT").unwrap_or_else(|_| "8000".to_string());
+    let bind_addr = format!("{}:{}", host, port);
+
     let server = HttpServer::new(move || {
+        let cors = Cors::default()
+            .allow_any_origin()
+            .allowed_methods(vec!["GET", "POST", "OPTIONS"])
+            .allowed_headers(vec![http::header::CONTENT_TYPE])
+            .max_age(3600);
+
         App::new()
+            .wrap(cors)
             .app_data(container.clone())
             .route("/health", web::get().to(health))
             .route("/zigs", web::post().to(create_zig))
@@ -83,13 +97,10 @@ pub async fn start_http_server(zig_service: Arc<ZigService>) -> ZigAnyResult<()>
             .route("/zigs/{id}/button-increment", web::post().to(increment_button_counter))
             .route("/zigs/{id}/ash-increment", web::post().to(increment_ash_counter))
     })
-    .bind("127.0.0.1:8000");
+    .bind(&bind_addr);
 
     match server {
-        Ok(server) => match server.run().await {
-            Ok(_) => Ok(()),
-            Err(err) => Err(ZigError::any(err.to_string().as_str())),
-        },
-        Err(err) => Err(ZigError::any(err.to_string().as_str())),
+        Ok(server) => server.run().await.map_err(|err| ZigError::any(&err.to_string())),
+        Err(err) => Err(ZigError::any(&err.to_string())),
     }
 }
