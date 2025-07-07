@@ -14,6 +14,10 @@ struct WebContextContainer {
     zig_service: Arc<ZigService>
 }
 
+async fn health() -> impl Responder {
+    HttpResponse::Ok().body("<3")
+}
+
 async fn create_zig(
     container: web::Data<Mutex<WebContextContainer>>,
     payload: web::Json<CreateZigRequest>,
@@ -73,6 +77,7 @@ pub async fn start_http_server(zig_service: Arc<ZigService>) -> ZigAnyResult<()>
     let server = HttpServer::new(move || {
         App::new()
             .app_data(container.clone())
+            .route("/health", web::get().to(health))
             .route("/zigs", web::post().to(create_zig))
             .route("/zigs/{id}", web::get().to(get_zig))
             .route("/zigs/{id}/button-increment", web::post().to(increment_button_counter))
